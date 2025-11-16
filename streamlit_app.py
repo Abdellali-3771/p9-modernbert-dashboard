@@ -4,12 +4,13 @@ import numpy as np
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import re
 
-# 🚨 OBLIGATOIRE : tout en haut juste après les imports
+# 🚨 MUST BE THE FIRST STREAMLIT COMMAND
 st.set_page_config(
     page_title="ModernBERT Sentiment – Projet 9",
     page_icon="🚀",
     layout="centered"
 )
+
 # -------------------------------------------------------------------
 #                  🔥 LOAD MODEL + TOKENIZER
 # -------------------------------------------------------------------
@@ -84,12 +85,6 @@ def compute_word_importance(tokens):
 # -------------------------------------------------------------------
 #                  🎨 STREAMLIT UI (DASHBOARD)
 # -------------------------------------------------------------------
-
-st.set_page_config(
-    page_title="ModernBERT Sentiment – Projet 9",
-    page_icon="🚀",
-    layout="centered"
-)
 
 st.title("🚀 ModernBERT – Sentiment Analysis")
 st.write("Modèle fine-tuné sur **100 000 tweets** – Projet OpenClassrooms P9")
