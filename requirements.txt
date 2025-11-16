@@ -9,3 +9,4 @@ scikit-learn
 
 markdown-it-py
 mdurl
+rich==13.7.1
