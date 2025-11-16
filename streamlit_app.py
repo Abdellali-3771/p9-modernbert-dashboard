@@ -5,7 +5,7 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import re
 
 # -------------------------------------------------------------------
-#                🔥 LOAD MODEL + TOKENIZER (LOCAL FOLDER)
+#                  🔥 LOAD MODEL + TOKENIZER
 # -------------------------------------------------------------------
 MODEL_PATH = "modernbert_export"
 
@@ -19,7 +19,7 @@ def load_model():
 tokenizer, model = load_model()
 
 # -------------------------------------------------------------------
-#                   🔧 PREPROCESSING IDENTIQUE AU TRAIN
+#                🔧 PREPROCESSING IDENTIQUE AU TRAIN
 # -------------------------------------------------------------------
 def preprocess_tweet(text: str) -> str:
     text = re.sub(r"https?://\S+|www\.\S+", "[URL]", text)
@@ -43,7 +43,7 @@ def predict_sentiment(text: str):
     )
 
     with torch.no_grad():
-        logits = model(**encoded).logits
+        logits = model(**encoded).logits.cpu()
         probs = torch.softmax(logits, dim=1)[0]
         pred = torch.argmax(probs).item()
 
@@ -59,6 +59,23 @@ def predict_sentiment(text: str):
     }
 
 # -------------------------------------------------------------------
+#              🎨 SIMPLE WORD IMPORTANCE (LEXICAL RULES)
+# -------------------------------------------------------------------
+NEGATIVE_WORDS = {
+    "bad","terrible","worst","awful","hate","angry","poor","disappointed",
+    "upset","sad","horrible","boring","annoying","slow"
+}
+
+def compute_word_importance(tokens):
+    scores = []
+    for w in tokens:
+        if w.lower() in NEGATIVE_WORDS:
+            scores.append((w, -0.8))
+        else:
+            scores.append((w, 0.4))
+    return scores
+
+# -------------------------------------------------------------------
 #                  🎨 STREAMLIT UI (DASHBOARD)
 # -------------------------------------------------------------------
 
@@ -68,8 +85,8 @@ st.set_page_config(
     layout="centered"
 )
 
-st.title("🚀 ModernBERT – Sentiment Analysis (Projet 9)")
-st.write("Modèle fine-tuné sur **100K tweets** – Projet OpenClassrooms P9")
+st.title("🚀 ModernBERT – Sentiment Analysis")
+st.write("Modèle fine-tuné sur **100 000 tweets** – Projet OpenClassrooms P9")
 
 st.markdown("---")
 
@@ -77,7 +94,7 @@ st.markdown("---")
 #       USER INPUT
 # =======================
 user_text = st.text_area(
-    "🔎 Écrivez un texte à analyser :",
+    "🔎 Texte à analyser :",
     placeholder="Ex: I love this product! It's amazing."
 )
 
@@ -87,7 +104,9 @@ if st.button("Analyser 🔥"):
     else:
         result = predict_sentiment(user_text)
 
-        # ------------------ RESULT BOX --------------------
+        # ======================================================
+        #                  📊 RESULT BOX
+        # ======================================================
         st.markdown("### 📊 Résultat")
         label = result["label"]
         conf = result["confidence"]
@@ -97,39 +116,33 @@ if st.button("Analyser 🔥"):
         else:
             st.error(f"😞 **Negative** (confiance : {conf:.2%})")
 
-        # ------------------ PROBABILITIES -----------------
+        # ======================================================
+        #                  📈 Probabilités
+        # ======================================================
         st.markdown("### 📈 Probabilités")
-        st.progress(result["probs"]["positive"])
-        st.write(f"**Positive** : {result['probs']['positive']:.3f}")
-        st.progress(result["probs"]["negative"])
-        st.write(f"**Negative** : {result['probs']['negative']:.3f}")
+        st.write(f"Positive : **{result['probs']['positive']:.3f}**")
+        st.write(f"Negative : **{result['probs']['negative']:.3f}**")
 
-        # ------------------ WORD IMPORTANCE (SIMPLE IG) ----
+        # ======================================================
+        #            🧠 Word Importance (Simple Approx)
+        # ======================================================
         st.markdown("### 🧠 Importance des mots (approx.)")
 
         tokens = result["processed_text"].split()
-        if len(tokens) == 0:
-            st.info("Pas d'analyse possible.")
-        else:
-            # Score simple : mot négatif → score négatif
-            word_scores = []
-            negative_words = ["bad", "terrible", "worst", "disappointed",
-                              "awful", "hate", "angry", "poor"]
+        scores = compute_word_importance(tokens)
 
-            for tok in tokens:
-                score = -1 if tok.lower() in negative_words else 0.5
-                word_scores.append((tok, score))
-
-            # Display results
-            for word, score in word_scores:
-                bar_color = "red" if score < 0 else "green"
-                st.write(f"**{word}** — contribution ({score})")
-                st.markdown(
-                    f"""
-                    <div style="height:10px;width:{abs(score)*50}px;background:{bar_color};margin-bottom:5px;"></div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+        for word, score in scores:
+            bar_color = "red" if score < 0 else "green"
+            bar_width = int(abs(score) * 80)
+            st.markdown(
+                f"""
+                <div style="margin:4px 0;">
+                    <b>{word}</b>
+                    <div style="height:8px;width:{bar_width}px;background:{bar_color};"></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
 st.markdown("---")
 st.caption("Projet 9 • ModernBERT • Déployé avec Streamlit Cloud")
