@@ -4,6 +4,12 @@ import numpy as np
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import re
 
+# 🚨 OBLIGATOIRE : tout en haut juste après les imports
+st.set_page_config(
+    page_title="ModernBERT Sentiment – Projet 9",
+    page_icon="🚀",
+    layout="centered"
+)
 # -------------------------------------------------------------------
 #                  🔥 LOAD MODEL + TOKENIZER
 # -------------------------------------------------------------------
