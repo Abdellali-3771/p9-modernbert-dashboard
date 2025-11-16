@@ -1,12 +1,47 @@
-streamlit==1.31.1
+# ================================================================
+# REQUIREMENTS.TXT - COMPATIBLE STREAMLIT CLOUD
+# ================================================================
+# Pour ModernBERT Sentiment Analysis - Projet 9
+# Testé et validé sur Streamlit Cloud (Python 3.11)
 
-torch==2.5.1
-transformers==4.37.2
+# ================================================================
+# STREAMLIT (version stable)
+# ================================================================
+streamlit==1.39.0
 
-numpy
-pandas
-scikit-learn
+# ================================================================
+# PYTORCH (CPU uniquement pour Streamlit Cloud)
+# ================================================================
+# IMPORTANT : Ne pas utiliser torch 2.5.x (trop récent)
+torch==2.3.0
+torchvision==0.18.0
 
-markdown-it-py
-mdurl
-rich==13.7.1
+# ================================================================
+# TRANSFORMERS (avec support ModernBERT)
+# ================================================================
+# Version 4.44+ requise pour ModernBERT
+transformers==4.44.0
+
+# ================================================================
+# TOKENIZERS (fix compatibilité Streamlit)
+# ================================================================
+# CRITIQUE : Version spécifique pour éviter erreurs Rust
+tokenizers==0.19.1
+
+# ================================================================
+# DEPENDENCIES SCIENTIFIQUES
+# ================================================================
+numpy==1.26.4
+pandas==2.2.2
+scikit-learn==1.5.1
+
+# ================================================================
+# ACCELERATE (optionnel mais recommandé)
+# ================================================================
+accelerate==0.33.0
+
+# ================================================================
+# AUTRES (si nécessaire)
+# ================================================================
+sentencepiece==0.2.0
+protobuf==4.25.3
