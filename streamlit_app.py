@@ -1,11 +1,10 @@
 import streamlit as st
 import torch
-import numpy as np
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import re
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 # ================================================================
-# 🚨 MUST BE THE FIRST STREAMLIT COMMAND
+# 🚨 STREAMLIT CONFIG — MUST BE THE FIRST STREAMLIT COMMAND
 # ================================================================
 st.set_page_config(
     page_title="ModernBERT Sentiment – Projet 9",
@@ -14,13 +13,16 @@ st.set_page_config(
 )
 
 # ================================================================
-# 🔥 LOAD MODEL + TOKENIZER
+# 🔥 LOAD MODEL + TOKENIZER (FAST DISABLED FOR STREAMLIT CLOUD)
 # ================================================================
 MODEL_PATH = "modernbert_export"
 
 @st.cache_resource
 def load_model():
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+    tokenizer = AutoTokenizer.from_pretrained(
+        MODEL_PATH,
+        use_fast=False   # ⛔️ IMPORTANT : éviter TokenizerFast + Rust
+    )
     model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH)
     model.eval()
     return tokenizer, model
@@ -68,7 +70,7 @@ def predict_sentiment(text: str):
     }
 
 # ================================================================
-# 🧠 SIMPLE WORD IMPORTANCE
+# 🧠 SIMPLE WORD IMPORTANCE (LEXICAL RULES)
 # ================================================================
 NEGATIVE_WORDS = {
     "bad","terrible","worst","awful","hate","angry","poor","disappointed",
@@ -92,6 +94,7 @@ st.write("Modèle fine-tuné sur **100 000 tweets** – Projet OpenClassrooms P9
 
 st.markdown("---")
 
+# User input
 user_text = st.text_area(
     "🔎 Texte à analyser :",
     placeholder="Ex: I love this product! It's amazing."
@@ -103,6 +106,9 @@ if st.button("Analyser 🔥"):
     else:
         result = predict_sentiment(user_text)
 
+        # ----------------------------------------------------------
+        # RESULT
+        # ----------------------------------------------------------
         st.markdown("### 📊 Résultat")
         label = result["label"]
         conf = result["confidence"]
@@ -112,11 +118,18 @@ if st.button("Analyser 🔥"):
         else:
             st.error(f"😞 **Negative** (confiance : {conf:.2%})")
 
+        # ----------------------------------------------------------
+        # PROBABILITIES
+        # ----------------------------------------------------------
         st.markdown("### 📈 Probabilités")
         st.write(f"Positive : **{result['probs']['positive']:.3f}**")
         st.write(f"Negative : **{result['probs']['negative']:.3f}**")
 
+        # ----------------------------------------------------------
+        # WORD IMPORTANCE
+        # ----------------------------------------------------------
         st.markdown("### 🧠 Importance des mots (approx.)")
+
         tokens = result["processed_text"].split()
         scores = compute_word_importance(tokens)
 
