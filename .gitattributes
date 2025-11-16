@@ -1,0 +1,2 @@
+modernbert_export/*.safetensors filter=lfs diff=lfs merge=lfs -text
+modernbert_export/*.bin filter=lfs diff=lfs merge=lfs -text

@@ -1,0 +1,20 @@
+{
+  "model_name": "ModernBERT-Sentiment-P9",
+  "architecture": "answerdotai/ModernBERT-base",
+  "task": "sentiment_analysis",
+  "labels": {
+    "0": "negative",
+    "1": "positive"
+  },
+  "max_length": 128,
+  "training_samples": 70000,
+  "test_results": {
+    "accuracy": 0.8485333333333334,
+    "f1": 0.8528878528878528,
+    "precision": 0.8290533736153072,
+    "recall": 0.8781333333333333,
+    "roc_auc": 0.9248134844444443,
+    "training_time_minutes": 45.46163601080577
+  },
+  "export_date": "2025-11-16T16:46:38.152650"
+}

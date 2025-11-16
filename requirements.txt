@@ -1,0 +1,8 @@
+streamlit==1.34.0
+transformers==4.40.1
+torch==2.1.2
+sentencepiece
+tokenizers
+safetensors
+numpy
+pandas
