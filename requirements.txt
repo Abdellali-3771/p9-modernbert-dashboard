@@ -1,6 +1,6 @@
 streamlit==1.37.0
-onnxruntime==1.20.0
+transformers==4.41.2
+torch==2.5.1
+tokenizers>=0.19.1
 numpy
-pandas
-scikit-learn
-matplotlib
+regex
