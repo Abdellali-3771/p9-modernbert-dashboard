@@ -2,9 +2,10 @@ import streamlit as st
 import torch
 import re
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import sys
 
 # ================================================================
-# 🚨 STREAMLIT CONFIG — FIRST COMMAND
+# 🚨 CONFIG STREAMLIT (OBLIGATOIRE EN PREMIER)
 # ================================================================
 st.set_page_config(
     page_title="ModernBERT Sentiment – Projet 9",
@@ -13,120 +14,191 @@ st.set_page_config(
 )
 
 # ================================================================
-# 🔥 LOAD MODEL (CPU, no fast tokenizer)
+# 🔧 DEBUG INFO (optionnel)
+# ================================================================
+with st.expander("🔧 Debug info"):
+    st.write(f"Python: {sys.version}")
+    st.write(f"PyTorch: {torch.__version__}")
+    import transformers
+    st.write(f"Transformers: {transformers.__version__}")
+
+
+# ================================================================
+# 🔥 CHARGEMENT DU TOKENIZER + MODÈLE
 # ================================================================
 MODEL_PATH = "modernbert_export"
 
 @st.cache_resource
 def load_model():
-    tokenizer = AutoTokenizer.from_pretrained(
-        MODEL_PATH,
-        use_fast=False  # IMPORTANT for Streamlit Cloud
-    )
-    model = AutoModelForSequenceClassification.from_pretrained(
-        MODEL_PATH
-    ).to("cpu")
-    model.eval()
-    return tokenizer, model
+    try:
+        # Tokenizer slow → évite Rust/tokenizers errors
+        tokenizer = AutoTokenizer.from_pretrained(
+            MODEL_PATH,
+            use_fast=False,            # ⚠️ IMPORTANT
+            trust_remote_code=True     # ⚠️ ModernBERT
+        )
+
+        # Modèle ModernBERT
+        model = AutoModelForSequenceClassification.from_pretrained(
+            MODEL_PATH,
+            trust_remote_code=True
+        )
+
+        model.eval()
+        model.to("cpu")               # Streamlit Cloud = CPU
+
+        return tokenizer, model
+
+    except Exception as e:
+        st.error(f"❌ Erreur chargement modèle/tokenizer : {e}")
+        st.stop()
+
 
 with st.spinner("⏳ Chargement du modèle ModernBERT..."):
     tokenizer, model = load_model()
 st.success("✅ Modèle chargé !")
 
+
 # ================================================================
-# 🔧 PREPROCESSING
+# 🧹 PREPROCESSING (identique au training)
 # ================================================================
-def preprocess_tweet(text: str) -> str:
+def preprocess_tweet(text):
     text = re.sub(r"https?://\S+|www\.\S+", "[URL]", text)
     text = re.sub(r"@\w+", "[USER]", text)
     text = re.sub(r"#(\w+)", r"\1", text)
     text = re.sub(r"(.)\1{3,}", r"\1\1", text)
+    text = re.sub(r"\s+", " ", text)
     return text.strip()
 
-# ================================================================
-# 🔮 INFERENCE
-# ================================================================
-def predict_sentiment(text: str):
-    processed = preprocess_tweet(text)
-
-    enc = tokenizer(
-        processed,
-        max_length=128,
-        truncation=True,
-        padding="max_length",
-        return_tensors="pt"
-    )
-
-    with torch.no_grad():
-        logits = model(**enc).logits
-        probs = torch.softmax(logits, dim=1)[0]
-        pred = torch.argmax(probs).item()
-
-    return {
-        "label": "Positive" if pred == 1 else "Negative",
-        "confidence": float(probs[pred]),
-        "probs": {
-            "positive": float(probs[1]),
-            "negative": float(probs[0])
-        },
-        "processed_text": processed
-    }
 
 # ================================================================
-# 🎨 SIMPLE WORD IMPORTANCE
+# 🔮 PREDICTION
 # ================================================================
-NEG = {"bad","terrible","worst","awful","hate","angry","poor","disappointed",
-       "upset","sad","horrible","boring","annoying","slow"}
+def predict_sentiment(text):
+    try:
+        processed = preprocess_tweet(text)
 
-def compute_word_importance(tokens):
-    scores = []
+        encoded = tokenizer(
+            processed,
+            max_length=128,
+            truncation=True,
+            padding="max_length",
+            return_tensors="pt"
+        )
+
+        with torch.no_grad():
+            logits = model(**encoded).logits.cpu()
+            probs = torch.softmax(logits, dim=1)[0]
+            pred = torch.argmax(probs).item()
+
+        return {
+            "label": "Positive" if pred == 1 else "Negative",
+            "confidence": float(probs[pred]),
+            "probs": {
+                "positive": float(probs[1]),
+                "negative": float(probs[0])
+            },
+            "processed": processed
+        }
+
+    except Exception as e:
+        st.error(f"❌ Erreur prédiction : {e}")
+        return None
+
+
+# ================================================================
+# 🧠 WORD IMPORTANCE (simple lexical)
+# ================================================================
+NEGATIVE = {
+    "bad", "terrible", "worst", "awful", "hate", "angry",
+    "poor", "disappointed", "sad", "boring", "slow"
+}
+POSITIVE = {
+    "good", "great", "best", "love", "excellent",
+    "amazing", "perfect", "awesome"
+}
+
+def word_importance(tokens):
+    out = []
     for w in tokens:
-        if w.lower() in NEG:
-            scores.append((w, -0.8))
+        wl = w.lower()
+        if wl in NEGATIVE:
+            out.append((w, -0.8))
+        elif wl in POSITIVE:
+            out.append((w, 0.8))
         else:
-            scores.append((w, 0.3))
-    return scores
+            out.append((w, 0.2))
+    return out
+
 
 # ================================================================
-# 🎨 UI
+# 🎨 INTERFACE STREAMLIT
 # ================================================================
-st.title("🚀 ModernBERT – Analyse de Sentiment (Projet P9)")
-st.write("Modèle fine-tuné sur **100 000 tweets** — compatible Streamlit Cloud")
-
+st.title("🚀 ModernBERT – Sentiment Analysis (Projet 9)")
+st.write("Modèle fine-tuné sur **100 000 tweets** — Projet P9 OpenClassrooms")
 st.markdown("---")
+
+examples = {
+    "Positif": "I love this product, it's amazing!",
+    "Négatif": "This is the worst experience ever.",
+    "Neutre": "The movie was okay, nothing special."
+}
+
+cols = st.columns(len(examples))
+preset = None
+for i, (name, txt) in enumerate(examples.items()):
+    if cols[i].button(name):
+        preset = txt
 
 user_text = st.text_area(
-    "🔎 Texte à analyser :",
-    placeholder="Ex: I love this product!"
+    "📝 Texte à analyser :",
+    value=preset if preset else "",
+    placeholder="Ex: I love this product!",
+    height=110
 )
 
-if st.button("🔥 Analyser"):
+if st.button("🔥 Analyser", type="primary"):
     if not user_text.strip():
-        st.warning("Veuillez entrer un texte.")
+        st.warning("⚠️ Veuillez entrer un texte.")
     else:
-        result = predict_sentiment(user_text)
+        with st.spinner("Analyse en cours..."):
+            result = predict_sentiment(user_text)
 
-        st.markdown("### 📊 Résultat")
-        if result["label"] == "Positive":
-            st.success(f"😊 **Positive** ({result['confidence']:.1%})")
-        else:
-            st.error(f"😞 **Negative** ({result['confidence']:.1%})")
+        if result:
+            st.markdown("### 📊 Résultat")
+            label = result["label"]
+            conf = result["confidence"]
 
-        st.markdown("### 📈 Probabilités")
-        st.write(result["probs"])
+            if label == "Positive":
+                st.success(f"😊 **Positive** — {conf:.2%}")
+            else:
+                st.error(f"😞 **Negative** — {conf:.2%}")
 
-        st.markdown("### 🧠 Importance des mots")
-        tokens = result["processed_text"].split()
-        scores = compute_word_importance(tokens)
+            st.markdown("### 📈 Probabilités")
+            st.write(f"Positive : {result['probs']['positive']:.3f}")
+            st.write(f"Negative : {result['probs']['negative']:.3f}")
 
-        for word, score in scores:
-            color = "red" if score < 0 else "green"
-            width = int(abs(score) * 80)
-            st.markdown(
-                f"<div><b>{word}</b> "
-                f"<div style='height:8px;width:{width}px;background:{color}'></div></div>",
-                unsafe_allow_html=True
-            )
+            st.markdown("### 🔧 Texte prétraité")
+            st.code(result["processed"])
+
+            st.markdown("### 🧠 Importance des mots")
+            tokens = result["processed"].split()
+            scores = word_importance(tokens)
+
+            html = []
+            for word, score in scores:
+                if score < 0:
+                    color = "#ff4444"
+                elif score > 0.5:
+                    color = "#44ff44"
+                else:
+                    color = "#cccccc"
+                opacity = abs(score)
+                html.append(
+                    f'<span style="background:{color};opacity:{opacity};'
+                    f'padding:3px;border-radius:4px;margin:2px">{word}</span>'
+                )
+            st.markdown(" ".join(html), unsafe_allow_html=True)
 
 st.markdown("---")
-st.caption("Projet 9 • Déployé sur Streamlit Cloud • ModernBERT (CPU)")
+st.caption("Projet 9 • ModernBERT • Déployé sur Streamlit Cloud")
